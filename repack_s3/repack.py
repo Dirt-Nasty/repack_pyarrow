@@ -177,6 +177,14 @@ def repack_prefix(
 		except Exception as e:
 			with ok_lock:
 				err_counter += 1
+				processed = ok_counter + err_counter
+				if processed % progress_step == 0 or processed == total:
+					elapsed = time.time() - start_time
+					rate = processed / elapsed if elapsed > 0 else 0.0
+					print(
+						f"[INFO] Progress: {processed}/{total} files processed "
+						f"in {elapsed:.1f}s ({rate:.1f} files/s)..."
+					)
 			print(f"[ERROR] {src_key} -> {dst_key}: {e}", file=sys.stderr)
 
 	if max_workers is None or max_workers <= 0:
