@@ -1,5 +1,7 @@
 import concurrent.futures
+import os
 import sys
+import tempfile
 import threading
 import time
 from typing import Iterable, List, Optional, Tuple
@@ -51,26 +53,52 @@ def list_parquet_keys(
 
 
 def rewrite_repack_streaming(
-	s3fs: S3FileSystem,
 	src_bucket: str,
 	src_key: str,
 	dst_bucket: str,
 	dst_key: str,
 	batch_size: int = 65536,
 ) -> None:
-	src_path = f"{_ensure_no_leading_slash(src_bucket)}/{_ensure_no_leading_slash(src_key)}"
-	dst_path = f"{_ensure_no_leading_slash(dst_bucket)}/{_ensure_no_leading_slash(dst_key)}"
+	"""
+	Repack a single Parquet file by downloading it locally, rewriting, and uploading.
 
-	with s3fs.open_input_file(src_path) as in_f:
-		pf = pq.ParquetFile(in_f)
+	This avoids relying on pyarrow's S3FileSystem for I/O, which can sometimes hang in
+	certain environments, and instead uses boto3 for S3 network operations.
+	"""
+	s3 = boto3.client("s3")
+
+	# Use local temp files; node has ample ephemeral storage on r6i.8xlarge.
+	src_tmp = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+	dst_tmp = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+	src_tmp_path = src_tmp.name
+	dst_tmp_path = dst_tmp.name
+	src_tmp.close()
+	dst_tmp.close()
+
+	try:
+		# Download source object
+		s3.download_file(src_bucket, src_key, src_tmp_path)
+
+		# Repack locally
+		pf = pq.ParquetFile(src_tmp_path)
 		schema = pf.schema_arrow
-		with s3fs.open_output_stream(dst_path) as out_f:
-			writer = pq.ParquetWriter(out_f, schema)
+		writer = pq.ParquetWriter(dst_tmp_path, schema)
+		try:
+			for batch in pf.iter_batches(batch_size=batch_size):
+				writer.write_batch(batch)
+		finally:
+			writer.close()
+
+		# Upload repacked object
+		s3.upload_file(dst_tmp_path, dst_bucket, dst_key)
+	finally:
+		# Best-effort cleanup of temp files
+		for path in (src_tmp_path, dst_tmp_path):
 			try:
-				for batch in pf.iter_batches(batch_size=batch_size):
-					writer.write_batch(batch)
-			finally:
-				writer.close()
+				if path and os.path.exists(path):
+					os.remove(path)
+			except Exception:
+				pass
 
 
 def _should_skip_existing(
