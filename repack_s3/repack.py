@@ -159,7 +159,6 @@ def repack_prefix(
 		)
 		return 0, 0
 
-	s3fs = S3FileSystem(region=None)
 	ok_counter = 0
 	err_counter = 0
 	ok_lock = threading.Lock()
@@ -187,7 +186,6 @@ def repack_prefix(
 			return
 		try:
 			rewrite_repack_streaming(
-				s3fs=s3fs,
 				src_bucket=src_bucket,
 				src_key=src_key,
 				dst_bucket=dst_bucket,
