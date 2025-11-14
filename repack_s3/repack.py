@@ -142,6 +142,9 @@ def repack_prefix(
 		nonlocal ok_counter, err_counter
 		rel = _rel_key(src_key, src_prefix)
 		dst_key = f"{dst_prefix}{rel}"
+		print(
+			f"[INFO] File start: s3://{src_bucket}/{src_key} -> s3://{dst_bucket}/{dst_key}"
+		)
 		if _should_skip_existing(dst_bucket, dst_key, skip_existing):
 			with ok_lock:
 				ok_counter += 1
@@ -164,6 +167,9 @@ def repack_prefix(
 				batch_size=batch_size,
 			)
 			_copy_metadata_if_available(src_bucket, src_key, dst_bucket, dst_key)
+			print(
+				f"[INFO] File done: s3://{src_bucket}/{src_key} -> s3://{dst_bucket}/{dst_key}"
+			)
 			with ok_lock:
 				ok_counter += 1
 				processed = ok_counter + err_counter
