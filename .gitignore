@@ -1,0 +1,26 @@
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# Local archives
+repack_pyarrow.zip
+
+
